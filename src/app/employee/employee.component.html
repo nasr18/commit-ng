@@ -1,0 +1,69 @@
+<h3 style="text-align: center">Employee Reports</h3>
+<!-- error -->
+@if (error) {
+<div>Error = {{ error }}</div>
+}
+
+<p-table
+  #dt
+  [value]="employees"
+  dataKey="_id"
+  [lazy]="true"
+  [paginator]="true"
+  [rows]="pageInfo.limit"
+  [totalRecords]="pageInfo.total"
+  [loading]="loading"
+  [rowsPerPageOptions]="[10, 25, 50]"
+  [globalFilterFields]="['employeeName', 'department']"
+  (onLazyLoad)="loadEmployees($event)"
+  [showCurrentPageReport]="true"
+  currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
+  [filterDelay]="0"
+  [resizableColumns]="true"
+  styleClass="p-datatable-gridlines"
+>
+  <ng-template pTemplate="caption">
+    <div class="flex justify-content-between align-items-center">
+      <h5 class="m-0">Payroll Management</h5>
+      <span class="p-input-icon-left">
+        <i class="pi pi-search"></i>
+        <input
+          pInputText
+          type="text"
+          (input)="dt.filterGlobal($event.target, 'contains')"
+          placeholder="Search..."
+        />
+      </span>
+    </div>
+  </ng-template>
+
+  <ng-template pTemplate="header">
+    <tr>
+      <th pSortableColumn="_id">ID <p-sortIcon field="_id" /></th>
+      <th pSortableColumn="employeeName">
+        Employee <p-sortIcon field="employeeName" />
+      </th>
+      <th pSortableColumn="department">
+        Department <p-sortIcon field="department" />
+      </th>
+      <th pSortableColumn="designation">
+        Designation <p-sortIcon field="designation" />
+      </th>
+    </tr>
+  </ng-template>
+
+  <ng-template pTemplate="body" let-employee>
+    <tr>
+      <td>{{ employee._id }}</td>
+      <td>{{ employee.employeeName }}</td>
+      <td>{{ employee.department }}</td>
+      <td>{{ employee.designation }}</td>
+    </tr>
+  </ng-template>
+
+  <ng-template pTemplate="emptymessage">
+    <tr>
+      <td colspan="5">No employees found.</td>
+    </tr>
+  </ng-template>
+</p-table>
