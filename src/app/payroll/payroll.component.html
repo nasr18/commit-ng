@@ -1,92 +1,122 @@
-<p>payroll works!</p>
 <div class="card">
-  <p-tabMenu [model]="items" [activeItem]="activeItem"></p-tabMenu>
-
-  <div class="p-fluid grid mt-3">
-    <div class="field col-12 md:col-4">
-      <label>Start Period (YYYY-MM)</label>
-      <p-calendar
-        [(ngModel)]="startDate"
-        view="month"
-        dateFormat="yy-mm"
-        [readonlyInput]="true"
-        (onSelect)="onDateSelect()"
-      ></p-calendar>
-    </div>
-    <div class="field col-12 md:col-4">
-      <label>End Period (YYYY-MM)</label>
-      <p-calendar
-        [(ngModel)]="endDate"
-        view="month"
-        dateFormat="yy-mm"
-        [readonlyInput]="true"
-        (onSelect)="onDateSelect()"
-      ></p-calendar>
-    </div>
-    <div class="field col-12 md:col-4">
-      <label>&nbsp;</label>
-      <button
-        pButton
-        type="button"
-        label="Load Data"
-        [disabled]="!startDate || !endDate"
-        (click)="loadData()"
-      ></button>
-    </div>
+  <div class="flex gap-3 mb-4">
+    <p-calendar
+      [(ngModel)]="startDate"
+      showIcon="true"
+      view="month"
+      dateFormat="yy-mm"
+      readonlyInput="true"
+      placeholder="Start Date"
+      (onSelect)="onDateSelect()"
+    ></p-calendar>
+    <p-calendar
+      [(ngModel)]="endDate"
+      showIcon="true"
+      view="month"
+      dateFormat="yy-mm"
+      readonlyInput="true"
+      placeholder="End Date"
+      (onSelect)="onDateSelect()"
+    ></p-calendar>
+    <p-button label="Generate Report" (onClick)="generateReport()"></p-button>
   </div>
 
-  <p-messages [value]="messages"></p-messages>
+  @if (showReports) {
+    <p-tabView>
+      <p-tabPanel header="Segmented Report">
+        <p-table
+          [value]="segmentedData"
+          [paginator]="true"
+          [rows]="10"
+          [totalRecords]="totalReports"
+          [lazy]="true"
+          (onLazyLoad)="loadSegmentedData($event)"
+        >
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Employee Name</th>
+              <th>Department</th>
+              <th pSortableColumn="totalEarnings">
+                Total Earnings
+                <p-sortIcon field="totalEarnings"></p-sortIcon>
+              </th>
+              <th>Deductions</th>
+              <th>Working Days</th>
+              <th>Leave Days</th>
+              <th>Net Pay</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-item>
+            <tr>
+              <td>{{ item.employee.employeeName }}</td>
+              <td>{{ item.employee.department }}</td>
+              <td>{{ item.periods[0].totalEarnings | currency: "SAR " }}</td>
+              <td>{{ item.periods[0].deductions | currency: "SAR " }}</td>
+              <td>{{ item.periods[0].workingDays }}</td>
+              <td>{{ item.periods[0].leaveDays }}</td>
+              <td>{{ item.periods[0].totalNetPay | currency: "SAR " }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-tabPanel>
 
-  <!-- Loading Indicator -->
-  @if (loading) {
-  <div class="flex justify-content-center">
-    <p-progressSpinner></p-progressSpinner>
-  </div>
-  }
+      @if (hasMultipleMonths) {
+        <p-tabPanel header="Aggregated Report">
+          <p-table [value]="aggregatedData">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>Employee Name</th>
+                <th>Department</th>
+                <th>Total Earnings</th>
+                <th>Total Deductions</th>
+                <th>Total Working Days</th>
+                <th>Total Leave Days</th>
+                <th>Average Net Pay</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-item>
+              <tr>
+                <td>{{ item.employee.employeeName }}</td>
+                <td>{{ item.employee.department }}</td>
+                <td>{{ item.totalEarnings | currency: "SAR " }}</td>
+                <td>{{ item.totalDeductions | currency: "SAR " }}</td>
+                <td>{{ item.totalWorkingDays }}</td>
+                <td>{{ item.totalLeaveDays }}</td>
+                <td>{{ item.averageNetPay | currency: "SAR " }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabPanel>
 
-  <!-- Segmented View -->
-  @if (!loading && activeView === 'segmented') {
-  <div class="mt-3">
-    <p-table
-      [value]="segmentedData"
-      [scrollable]="true"
-      styleClass="p-datatable-gridlines"
-      [tableStyle]="{ 'min-width': '50rem' }"
-    >
-      <ng-template pTemplate="header">
-        <tr>
-          <th>Employee</th>
-          <th>Department</th>
-          <th>Designation</th>
-          @for (period of periods; track $index) {
-          <th>{{ formatPeriod(period) }}</th>
-          }
-        </tr>
-      </ng-template>
-      <ng-template pTemplate="body" let-employee>
-        <tr>
-          <td>{{ employee.employee.employeeName }}</td>
-          <td>{{ employee.employee.department }}</td>
-          <td>{{ employee.employee.designation }}</td>
-          @for (period of periods; track $index) {
-          <td>
-            @if (getPeriodData(employee, period); as data) {
-            <div class="text-sm">
-              <div>
-                Net Pay:
-                {{ data.totalNetPay | currency : "SAR " : "symbol" : "1.0-0" }}
-              </div>
-              <div>Working Days: {{ data.workingDays }}</div>
-              <div>Leave Days: {{ data.leaveDays }}</div>
-            </div>
-            } @else {
-            <div class="text-gray-400">No data</div>
-            }
-          </td>
-          }
-        </tr>
-      </ng-template>
-    </p-table>
-  </div>
+        <p-tabPanel header="Comparison Report">
+          <p-table [value]="comparisonData">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>Employee Name</th>
+                <th>Department</th>
+                <th>Earnings Diff</th>
+                <th>Deductions Diff</th>
+                <th>Working Days Diff</th>
+                <th>Leave Days Diff</th>
+                <th>Net Pay Diff</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-item>
+              <tr>
+                <td>{{ item.employee.employeeName }}</td>
+                <td>{{ item.employee.department }}</td>
+                <td>{{ item.earningsDiff | currency: "SAR " }}</td>
+                <td>{{ item.deductionsDiff | currency: "SAR " }}</td>
+                <td>{{ item.workingDaysDiff }}</td>
+                <td>{{ item.leaveDaysDiff }}</td>
+                <td>
+                  {{ item.netPayDiff | currency: "SAR " }}
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabPanel>
+      }
+    </p-tabView>
   }
 </div>

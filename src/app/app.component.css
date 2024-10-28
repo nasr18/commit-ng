@@ -1,0 +1,24 @@
+nav {
+  background-color: #f8f9fa;
+  padding: 1rem;
+}
+
+ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 1rem;
+}
+
+a {
+  text-decoration: none;
+  color: #333;
+  padding: 0.5rem 1rem;
+}
+
+a.active {
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+}

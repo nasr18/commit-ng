@@ -1,15 +1,16 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 
 import { MenuItem } from 'primeng/api';
 import { TabMenuModule } from 'primeng/tabmenu';
 import { CalendarModule } from 'primeng/calendar';
 import { MessagesModule } from 'primeng/messages';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { TableLazyLoadEvent, TableModule } from 'primeng/table';
+import { TabViewModule } from 'primeng/tabview';
 
-import { GqlService } from '../gql.service';
-import { FormsModule } from '@angular/forms';
-import { TableModule } from 'primeng/table';
-import { CurrencyPipe } from '@angular/common';
+import { PayrollService } from './payroll.service';
 
 @Component({
   selector: 'app-payroll',
@@ -21,13 +22,16 @@ import { CurrencyPipe } from '@angular/common';
     MessagesModule,
     ProgressSpinnerModule,
     TableModule,
+    TabViewModule,
     CurrencyPipe,
+    DatePipe,
   ],
+  providers: [PayrollService],
   templateUrl: './payroll.component.html',
   styleUrl: './payroll.component.css',
 })
-export class PayrollComponent implements OnInit {
-  readonly #gqlService = inject(GqlService);
+export class PayrollComponent {
+  readonly #payrollService = inject(PayrollService);
 
   loading = false;
   items: MenuItem[] = [];
@@ -37,38 +41,13 @@ export class PayrollComponent implements OnInit {
   endDate: Date = new Date();
   messages: any[] = [];
 
+  totalReports: number = 0;
+  showReports: boolean = false;
+  hasMultipleMonths: boolean = false;
   segmentedData: any[] = [];
   aggregatedData: any[] = [];
   comparisonData: any[] = [];
   periods: string[] = [];
-
-  ngOnInit(): void {
-    this.items = [
-      { label: 'Segmented View', command: () => this.changeView('segmented') },
-      {
-        label: 'Aggregated View',
-        command: () => this.changeView('aggregated'),
-      },
-      {
-        label: 'Comparison View',
-        command: () => this.changeView('comparison'),
-      },
-    ];
-    this.activeItem = this.items[0];
-  }
-
-  changeView(view: 'segmented' | 'aggregated' | 'comparison') {
-    this.activeView = view;
-    this.loadData();
-  }
-
-  formatPeriod(period: string): string {
-    const [year, month] = period.split('-');
-    return new Date(parseInt(year), parseInt(month) - 1).toLocaleString(
-      'default',
-      { month: 'short', year: 'numeric' }
-    );
-  }
 
   onDateSelect() {
     if (this.startDate && this.endDate) {
@@ -81,84 +60,88 @@ export class PayrollComponent implements OnInit {
           },
         ];
         this.endDate = new Date();
-      } else {
-        this.messages = [];
+        return;
       }
+
+      this.messages = [];
+      const start = new Date(this.startDate);
+      const end = new Date(this.endDate);
+      this.hasMultipleMonths =
+        end.getMonth() -
+          start.getMonth() +
+          12 * (end.getFullYear() - start.getFullYear()) >
+        0;
+      console.log('hasMultipleMonths:', this.hasMultipleMonths);
     }
   }
 
   getFormattedDate(date: Date): string {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
       2,
-      '0'
+      '0',
     )}`;
   }
 
-  getPeriodData(employee: any, period: string) {
-    const periodData = employee.periods.find((p: any) => p.period === period);
-    return periodData?.payrollData;
-  }
+  loadSegmentedData(event: TableLazyLoadEvent) {
+    const { first, rows, sortField, sortOrder } = event;
+    const page = rows || 10;
+    const limit = first === 0 ? 1 : (first || 0) / page + 1;
 
-  extractUniquePeriods(data: any[]): string[] {
-    const periods = new Set<string>();
-    data.forEach((employee) => {
-      employee.periods.forEach((period: any) => {
-        periods.add(period.period);
+    this.#payrollService
+      .getSegmentedData({
+        dateRange: {
+          startDate: this.getFormattedDate(this.startDate),
+          endDate: this.getFormattedDate(this.endDate),
+        },
+        page,
+        limit,
+        sortField,
+        sortOrder: sortOrder === 1 ? 'asc' : 'desc',
+      })
+      .subscribe(({ data }: any) => {
+        this.segmentedData = data.getSegmentedPayroll.items;
+        this.totalReports = data.getSegmentedPayroll.totalRecords;
+        this.showReports = true;
       });
-    });
-    return Array.from(periods).sort();
   }
 
-  loadData() {
-    switch (this.activeView) {
-      case 'segmented':
-        this.loadSegmentedData();
-        break;
-      case 'aggregated':
-        this.loadAggregatedData();
-        break;
-      // case 'comparison':
-      //   this.loadComparisonData();
-      //   break;
+  generateReport() {
+    if (!this.startDate || !this.endDate) return;
+
+    const dateRange = {
+      startDate: this.getFormattedDate(this.startDate),
+      endDate: this.getFormattedDate(this.endDate),
+    };
+
+    this.loadSegmentedData({ first: 0, rows: 10 });
+
+    if (this.hasMultipleMonths) {
+      // Load aggregated data
+      this.#payrollService
+        .getAggregatedData({
+          dateRange,
+          page: 1,
+          limit: 10,
+        })
+        .subscribe(({ data }: any) => {
+          this.aggregatedData = data.getAggregatedPayroll;
+        });
+
+      // Load comparison data
+      const period1 = {
+        startDate: this.getFormattedDate(this.startDate),
+        endDate: this.getFormattedDate(this.startDate),
+      };
+      const period2 = {
+        startDate: this.getFormattedDate(this.endDate),
+        endDate: this.getFormattedDate(this.endDate),
+      };
+
+      this.#payrollService
+        .getComparisonData({ period1, period2, page: 1, limit: 10 })
+        .subscribe(({ data }: any) => {
+          this.comparisonData = data.getComparisonData;
+        });
     }
   }
-
-  loadSegmentedData() {
-    const startPeriod = this.getFormattedDate(this.startDate);
-    const endPeriod = this.getFormattedDate(this.endDate);
-
-    this.#gqlService
-      .getSegmentedData({
-        startDate: `${startPeriod}-01`,
-        endDate: `${endPeriod}-31`,
-      })
-      .subscribe(({ data }: any) => {
-        this.segmentedData = data.getSegmentedPayrolls;
-        this.periods = this.extractUniquePeriods(data.getSegmentedPayrolls);
-      });
-  }
-
-  loadAggregatedData() {
-    const startPeriod = this.getFormattedDate(this.startDate);
-    const endPeriod = this.getFormattedDate(this.endDate);
-
-    this.#gqlService
-      .getAggregatedData({
-        startDate: `${startPeriod}-01`,
-        endDate: `${endPeriod}-31`,
-      })
-      .subscribe(({ data }: any) => {
-        this.segmentedData = data.getSegmentedPayrolls;
-        this.periods = this.extractUniquePeriods(data.getSegmentedPayrolls);
-      });
-  }
-
-  // loadComparisonData() {
-  //   this.#gqlService
-  //     .getComparisonData({ firstPeriod: this.startDate, endDate: this.endDate })
-  //     .subscribe(({ data }: any) => {
-  //       this.segmentedData = data.getSegmentedPayrolls;
-  //       this.periods = this.extractUniquePeriods(data.getSegmentedPayrolls);
-  //     });
-  // }
 }

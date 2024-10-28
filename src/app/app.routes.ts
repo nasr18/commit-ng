@@ -13,4 +13,9 @@ export const routes: Routes = [
     component: PayrollComponent,
     pathMatch: 'full',
   },
+  {
+    path: '',
+    redirectTo: 'employee',
+    pathMatch: 'full',
+  }
 ];

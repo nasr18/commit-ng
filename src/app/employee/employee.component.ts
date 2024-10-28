@@ -5,18 +5,19 @@ import { Subscription } from 'rxjs';
 import { TableLazyLoadEvent, TableModule } from 'primeng/table';
 import { InputTextModule } from 'primeng/inputtext';
 
-import { GqlService } from '../gql.service';
+import { EmployeeService } from './employee.service';
 import { Employee, PageInfo } from '../../types';
 
 @Component({
   selector: 'app-employee',
   standalone: true,
   imports: [TableModule, InputTextModule, DatePipe, DecimalPipe],
+  providers: [EmployeeService],
   templateUrl: './employee.component.html',
   styleUrl: './employee.component.css',
 })
 export class EmployeeComponent implements OnDestroy {
-  readonly #gqlService = inject(GqlService);
+  readonly #employeeService = inject(EmployeeService);
 
   pageInfo: PageInfo = {
     page: 1,
@@ -38,7 +39,7 @@ export class EmployeeComponent implements OnDestroy {
     this.pageInfo.page =
       event.first === 0 ? 1 : (event.first || 0) / this.pageInfo.limit + 1;
 
-    this.querySubscription = this.#gqlService
+    this.querySubscription = this.#employeeService
       .getEmployees({
         page: this.pageInfo.page,
         limit: this.pageInfo.limit,
